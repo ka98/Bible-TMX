@@ -49,6 +49,12 @@ for row in all_rows:
     src_line = src_line.replace(";", "; ")
     tgt_line = tgt_line.replace(";", "; ")
     
+    src_line = src_line.replace("!", "! ")
+    tgt_line = tgt_line.replace("!", "! ")
+    
+    src_line = src_line.replace("?", "? ")
+    tgt_line = tgt_line.replace("?", "? ")
+    
     #remove double space - is due to the previous statement, it will produce doulbe spaces in the text
     src_line = src_line.replace("  ", " ")
     tgt_line = tgt_line.replace("  ", " ")
