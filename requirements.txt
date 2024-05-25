@@ -1,2 +1,4 @@
 translate-toolkit
 lxml
+pandas
+openpyxl

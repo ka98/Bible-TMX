@@ -1,4 +1,4 @@
-source="res/nb-NO/nb-NO_DNB1930.sqlite"
+source="res/nb-NO/no-NO_NB88_07.sqlite"
 targets=[
     "res/bg-BG/bg-BG_BG1940.sqlite",
     "res/de-DE/de-DE_LUT2017.sqlite",

@@ -1,3 +1,4 @@
 *.tmx
 *.sqlite
+*.xlsx
 __pycache__

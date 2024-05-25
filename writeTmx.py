@@ -4,8 +4,11 @@ import sqlite3
 from lxml import etree
 from translate.storage.tmx import tmxfile, tmxunit
 from translate.misc.xml_helpers import setXMLlang
+from pandas import DataFrame
+from multiprocessing import Pool
 
 from os.path import basename
+import os
 
 import input
 
@@ -35,9 +38,8 @@ def addcontextkey_patch(self, text, origin=None, position="append"):
         
 setattr(tmxfile, "addtranslation", addtranslation_patch)
 setattr(tmxunit, "addcontextkey", addcontextkey_patch)
-
-for target in input.targets:
-
+    
+def align_bible(target):
     conn = sqlite3.connect(input.source)
     c = conn.cursor()
     c.execute (f"ATTACH DATABASE '{target}' AS target_bible;")
@@ -131,5 +133,57 @@ for target in input.targets:
         tgt_line = tgt_line.strip()
         
         my_tmxfile.addtranslation(src_line, SOURCE_LANG, tgt_line, TARGET_LANG, context_key=f"{row[8]} {row[2]},{row[3]}")
-    with open(f"{target}.tmx", "wb") as output:
+    with open(f"{target}NB88_07.tmx", "wb") as output:
         my_tmxfile.serialize(output)
+    
+    if target == "res/sl-SI/sl-SI_SSP.sqlite":
+        c.execute ("""
+            SELECT book.name, nb.chapter, nb.verse, nb.text FROM verse AS nb
+    LEFT JOIN book AS book
+    ON book.book_reference_id == nb.book_id
+    LEFT JOIN target_bible.verse AS tg
+    ON ((book.testament_reference_id == 1 AND nb.book_id == tg.book_id) OR (book.testament_reference_id == 2 AND nb.book_id == (tg.book_id-10)))
+    AND nb.chapter == tg.chapter
+    AND nb.verse == tg.verse
+    WHERE tg.verse IS NULL
+    UNION ALL
+    SELECT book.name, tg.chapter, tg.verse, tg.text FROM target_bible.verse AS tg
+    LEFT JOIN book AS book
+    ON ((book.testament_reference_id == 1 AND book.book_reference_id == tg.book_id) OR (book.testament_reference_id == 2 AND book.book_reference_id == (tg.book_id-10)))
+    LEFT JOIN verse AS nb
+    ON ((book.testament_reference_id == 1 AND nb.book_id == tg.book_id) OR (book.testament_reference_id == 2 AND nb.book_id == (tg.book_id-10)))
+    AND nb.chapter == tg.chapter
+    AND nb.verse == tg.verse
+    WHERE nb.verse IS NULL;
+            """
+            )
+    
+    else:
+        c.execute ("""
+            SELECT book.name, nb.chapter, nb.verse, nb.text FROM verse AS nb
+    LEFT JOIN book AS book
+    ON book.book_reference_id == nb.book_id
+    LEFT JOIN target_bible.verse AS tg
+    ON nb.book_id == tg.book_id
+    AND nb.chapter == tg.chapter
+    AND nb.verse == tg.verse
+    WHERE tg.verse IS NULL
+    UNION ALL
+    SELECT book.name, tg.chapter, tg.verse, tg.text FROM target_bible.verse AS tg
+    LEFT JOIN book AS book
+    ON book.book_reference_id == tg.book_id
+    LEFT JOIN verse AS nb
+    ON nb.book_id == tg.book_id
+    AND nb.chapter == tg.chapter
+    AND nb.verse == tg.verse
+    WHERE nb.verse IS NULL;
+            """
+            )
+    
+    all_rows = c.fetchall()
+    df = DataFrame(all_rows, columns=['name', 'chapter', 'verse', 'text'])
+    df.to_excel(f"{target}.xlsx", sheet_name='sheet1', index=False)
+    
+# multiprocessing
+pool = Pool(os.cpu_count())    
+pool.map(align_bible, input.targets)
