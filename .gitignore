@@ -1,2 +1,3 @@
 *.tmx
 *.sqlite
+__pycache__

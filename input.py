@@ -1,0 +1,13 @@
+source="res/nb-NO/nb-NO_DNB1930.sqlite"
+targets=[
+    "res/bg-BG/bg-BG_BG1940.sqlite",
+    "res/de-DE/de-DE_LUT2017.sqlite",
+    "res/en-US/en-US_NKJV.sqlite",
+    "res/es-ES/es-ES_RVR1960.sqlite",
+    "res/fr-FR/fr-FR_NEG79.sqlite",
+    "res/nl-NL/nl-NL_HSV.sqlite",
+    "res/nl-NL/nl-NL_NBG1951.sqlite",
+    "res/ru-RU/ru-RU_NRT.sqlite",
+    "res/ru-RU/ru-RU_SYNO.sqlite",
+    "res/sl-SI/sl-SI_SSP.sqlite",
+]
