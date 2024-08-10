@@ -6,9 +6,11 @@ from translate.storage.tmx import tmxfile, tmxunit
 from translate.misc.xml_helpers import setXMLlang
 from pandas import DataFrame
 from multiprocessing import Pool
+from pathlib import Path
 
 from os.path import basename
 import os
+from itertools import product
 
 import input
 
@@ -39,8 +41,8 @@ def addcontextkey_patch(self, text, origin=None, position="append"):
 setattr(tmxfile, "addtranslation", addtranslation_patch)
 setattr(tmxunit, "addcontextkey", addcontextkey_patch)
     
-def align_bible(target):
-    conn = sqlite3.connect(input.source)
+def align_bible(source, target):
+    conn = sqlite3.connect(source)
     c = conn.cursor()
     c.execute (f"ATTACH DATABASE '{target}' AS target_bible;")
     
@@ -56,6 +58,20 @@ def align_bible(target):
         ON mapping.book_es == tg.book_id
         AND nb.chapter == tg.chapter
         AND nb.verse == tg.verse
+        """
+        )
+        
+    elif target == "res/kha-IN/kha-IN_BSI.sqlite":
+        c.execute ("""
+        SELECT * from verse as en
+        INNER JOIN target_bible.book as book
+        ON book.book_reference_id == tg.book_id
+        INNER JOIN target_bible.mapping AS mapping
+        ON en.book_id == mapping.book_en
+        INNER JOIN target_bible.verse as tg
+        ON mapping.book_kha == tg.book_id
+        AND en.chapter == tg.chapter
+        AND en.verse == tg.verse
         """
         )
     
@@ -86,15 +102,20 @@ def align_bible(target):
 
     all_rows = c.fetchall()
     
-    SOURCE_LANG = basename(input.source)[:5]
-    TARGET_LANG = basename(target)[:5]
+    SOURCE_LANG = basename(source)[:5]
+    if target == "res/kha-IN/kha-IN_BSI.sqlite":
+        TARGET_LANG = basename(target)[:6]
+    else:  
+        TARGET_LANG = basename(target)[:5]
 
     my_tmxfile = tmxfile(None, SOURCE_LANG, TARGET_LANG)
+    
+    rows_list=[]
 
     for row in all_rows:
         
         src_line : str = row[4]
-        if target == "res/es-ES/es-ES_RVR1960.sqlite":
+        if target == "res/es-ES/es-ES_RVR1960.sqlite" or target == "res/kha-IN/kha-IN_BSI.sqlite" : 
             tgt_line : str = row[15]
         else:
             tgt_line : str = row[13]
@@ -132,9 +153,16 @@ def align_bible(target):
         src_line = src_line.strip()
         tgt_line = tgt_line.strip()
         
+        rows_list.append({"nb_1930": src_line, "nb_1988": tgt_line, "verse":f"{row[8]} {row[2]},{row[3]}"})
         my_tmxfile.addtranslation(src_line, SOURCE_LANG, tgt_line, TARGET_LANG, context_key=f"{row[8]} {row[2]},{row[3]}")
-    with open(f"{target}NB88_07.tmx", "wb") as output:
+    os.makedirs(f"{os.path.dirname(target)}/{Path(source).stem}", exist_ok=True)
+    with open(f"{os.path.dirname(target)}/{Path(source).stem}/{Path(source).stem}_to_{Path(target).stem}.tmx", "wb") as output:
         my_tmxfile.serialize(output)
+        
+    df = DataFrame(rows_list, columns=['nb_1930', 'nb_1988', 'verse'])
+    df.to_excel(f"{os.path.dirname(target)}/{Path(source).stem}/{Path(source).stem}_to_{Path(target).stem}_excel.xlsx", sheet_name='sheet1', index=False)
+        
+    # TODO: make excel for Spanish
     
     if target == "res/sl-SI/sl-SI_SSP.sqlite":
         c.execute ("""
@@ -182,8 +210,8 @@ def align_bible(target):
     
     all_rows = c.fetchall()
     df = DataFrame(all_rows, columns=['name', 'chapter', 'verse', 'text'])
-    df.to_excel(f"{target}.xlsx", sheet_name='sheet1', index=False)
+    df.to_excel(f"{os.path.dirname(target)}/{Path(source).stem}/{Path(source).stem}_to_{Path(target).stem}_missing.xlsx", sheet_name='sheet1', index=False)
     
 # multiprocessing
-pool = Pool(os.cpu_count())    
-pool.map(align_bible, input.targets)
+pool = Pool(os.cpu_count())
+pool.starmap(align_bible, product(input.sources, input.targets))
